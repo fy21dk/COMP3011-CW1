@@ -227,19 +227,34 @@ export default function HomeClient({ initialData }: Props) {
           </h1>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            {featured.map((item, idx) => (
-              <div key={idx}>
-                {item ? (
-                  <WeatherCard
-                    item={item}
-                    variant={idx === 0 ? "default" : "secondary"}
-                    onDelete={() => removeFeatured(idx as 0 | 1)}
-                  />
-                ) : (
-                  <div style={{ color: "#6b7280" }}>비어 있습니다.</div>
-                )}
-              </div>
-            ))}
+            {featured.map((item, idx) => {
+              const isSelected = selectedLocationId === item?.location.id;
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => item && setSelectedLocationId(item.location.id)}
+                  style={{
+                    cursor: item ? "pointer" : "default",
+                    border: isSelected
+                      ? "2px solid #2563eb"
+                      : "2px solid transparent",
+                    borderRadius: 16,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {item ? (
+                    <WeatherCard
+                      item={item}
+                      variant={idx === 0 ? "default" : "secondary"}
+                      onDelete={() => removeFeatured(idx as 0 | 1)}
+                    />
+                  ) : (
+                    <div style={{ color: "#6b7280" }}>비어 있습니다.</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -278,16 +293,48 @@ export default function HomeClient({ initialData }: Props) {
             <div style={{ textAlign: "right" }}>Delete</div>
           </div>
 
-          {listItems.map((item) => (
-            <WeatherRow
-              key={item.location.id}
-              item={item}
-              onPromote={() => promoteToFeatured(item)}
-              showDelete
-              onDeleted={() => router.refresh()}
-              toast={showToast}
-            />
-          ))}
+          <div style={{ display: "flex", flexDirection: "column", paddingRight: 4 }}>
+            {listItems.map((item) => {
+              const isSelected = selectedLocationId === item.location.id;
+
+              return (
+                <div
+                  key={item.location.id}
+                  onClick={() => setSelectedLocationId(item.location.id)}
+                  style={{
+                    cursor: "pointer",
+                    borderRadius: 12,
+                    background: isSelected ? "#eff6ff" : "transparent",
+                    border: isSelected
+                      ? "1px solid #bfdbfe"
+                      : "1px solid transparent",
+                    flexShrink: 0,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <WeatherRow
+                    item={item}
+                    onPromote={() => promoteToFeatured(item)}
+                    showDelete
+                    onDeleted={() => {
+                      const deletedId = item.location.id;
+
+                      setOptimistic((prev) =>
+                        prev.filter((x) => x.location.id !== deletedId)
+                      );
+
+                      if (selectedLocationId === deletedId) {
+                        setSelectedLocationId(null);
+                      }
+
+                      router.refresh();
+                    }}
+                    toast={showToast}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </section>
 
         {/* Analytics */}
@@ -300,7 +347,17 @@ export default function HomeClient({ initialData }: Props) {
           }}
         >
           {selectedLocationId ? (
-            <AnalyticsPanel locationId={selectedLocationId} />
+            <AnalyticsPanel
+              locationId={selectedLocationId}
+              locationName={
+                featured[0]?.location.id === selectedLocationId
+                  ? featured[0]?.location.name
+                  : featured[1]?.location.id === selectedLocationId
+                  ? featured[1]?.location.name
+                  : listItems.find((x) => x.location.id === selectedLocationId)
+                      ?.location.name
+              }
+            />
           ) : (
             <div style={{ color: "#6b7280" }}>선택된 도시가 없습니다.</div>
           )}
