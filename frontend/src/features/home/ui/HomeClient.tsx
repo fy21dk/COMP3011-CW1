@@ -11,6 +11,7 @@ import WeatherRow from "@/features/home/ui/WeatherRow";
 import Toast from "@/features/home/ui/Toast";
 import AddLocationBox from "@/features/locations/ui/AddLocationBox";
 import { patchLocation } from "@/features/locations/api";
+import AnalyticsPanel from "@/features/analytics/ui/AnalyticsPanel";
 
 type Props = {
   initialData: HomeResponse;
@@ -30,6 +31,10 @@ export default function HomeClient({ initialData }: Props) {
 
   const [optimistic, setOptimistic] = useState<HomeItemDTO[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(
+    null
+  );
+
   const toastTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -54,13 +59,35 @@ export default function HomeClient({ initialData }: Props) {
 
     for (const it of base) {
       const id = it.location.id;
+
+      if (!it.location.is_active) continue;
       if (featuredIds.has(id)) continue;
       if (seen.has(id)) continue;
+
       seen.add(id);
       merged.push(it);
     }
+
     return merged;
   }, [data.list, optimistic, featured]);
+
+  useEffect(() => {
+    if (selectedLocationId !== null) return;
+
+    if (featured[0]?.location.id) {
+      setSelectedLocationId(featured[0].location.id);
+      return;
+    }
+
+    if (featured[1]?.location.id) {
+      setSelectedLocationId(featured[1].location.id);
+      return;
+    }
+
+    if (listItems.length > 0) {
+      setSelectedLocationId(listItems[0].location.id);
+    }
+  }, [featured, listItems, selectedLocationId]);
 
   const removeFeatured = async (index: 0 | 1) => {
     const target = featured[index];
@@ -83,6 +110,15 @@ export default function HomeClient({ initialData }: Props) {
         if (index === 0) return [prev[1] ?? null, null];
         return [prev[0], null];
       });
+
+      if (selectedLocationId === locId) {
+        const fallbackId =
+          index === 0
+            ? featured[1]?.location.id ?? null
+            : featured[0]?.location.id ?? null;
+
+        setSelectedLocationId(fallbackId);
+      }
 
       router.refresh();
     } catch (e) {
@@ -119,12 +155,7 @@ export default function HomeClient({ initialData }: Props) {
 
       router.refresh();
     } catch (e) {
-      const msg = String(e);
-      if (msg.includes("409")) {
-        showToast("이미 상단 등록이 2개입니다. 다른 카드를 먼저 삭제하세요.");
-        return;
-      }
-      showToast(`상단 등록 실패: ${msg}`);
+      showToast(`상단 등록 실패: ${String(e)}`);
     }
   };
 
@@ -145,25 +176,47 @@ export default function HomeClient({ initialData }: Props) {
         x.location.id === id ? { location: loc, latest } : x
       );
     });
+
+    if (selectedLocationId === null) {
+      setSelectedLocationId(id);
+    }
   };
 
   return (
     <>
       <main
         style={{
-          height: "100vh",
-          display: "grid",
-          gridTemplateRows: "auto 1fr",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
           gap: 14,
           padding: 18,
           background: "#f3f4f6",
           fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
         }}
       >
-        {/* 상단 2-card */}
+        {/* Header */}
         <section
           style={{
-            background: "#ffffff",
+            background: "linear-gradient(135deg,#0f172a,#1e293b)",
+            color: "#fff",
+            borderRadius: 18,
+            padding: "22px 24px",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.10)",
+          }}
+        >
+          <div style={{ fontSize: 28, fontWeight: 900 }}>
+            Climate & Weather Analytics Dashboard
+          </div>
+          <div style={{ marginTop: 8, fontSize: 14, color: "#cbd5e1" }}>
+            Monitor featured cities, manage locations, and explore analytics.
+          </div>
+        </section>
+
+        {/* Featured */}
+        <section
+          style={{
+            background: "#fff",
             borderRadius: 16,
             padding: 18,
             boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
@@ -173,52 +226,30 @@ export default function HomeClient({ initialData }: Props) {
             Featured Locations
           </h1>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-            }}
-          >
-            <div>
-              {featured[0] ? (
-                <WeatherCard
-                  item={featured[0]}
-                  variant="default"
-                  onDelete={() => removeFeatured(0)}
-                />
-              ) : (
-                <div style={{ color: "#6b7280" }}>비어 있습니다.</div>
-              )}
-            </div>
-
-            <div>
-              {featured[1] ? (
-                <WeatherCard
-                  item={featured[1]}
-                  variant="secondary"
-                  onDelete={() => removeFeatured(1)}
-                />
-              ) : (
-                <div style={{ color: "#6b7280" }}>비어 있습니다.</div>
-              )}
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {featured.map((item, idx) => (
+              <div key={idx}>
+                {item ? (
+                  <WeatherCard
+                    item={item}
+                    variant={idx === 0 ? "default" : "secondary"}
+                    onDelete={() => removeFeatured(idx as 0 | 1)}
+                  />
+                ) : (
+                  <div style={{ color: "#6b7280" }}>비어 있습니다.</div>
+                )}
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* 하단 리스트 */}
+        {/* My Locations */}
         <section
           style={{
-            background: "#ffffff",
+            background: "#fff",
             borderRadius: 16,
             padding: 18,
-            overflowY: "auto",
             boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            justifyContent: "flex-start",
-            alignItems: "stretch",
           }}
         >
           <h2 style={{ fontSize: 18, fontWeight: 900 }}>My Locations</h2>
@@ -232,11 +263,10 @@ export default function HomeClient({ initialData }: Props) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "220px 120px 1fr 220px",
+              gridTemplateColumns: "220px 120px 1fr 160px 90px",
               gap: 12,
-              padding: "10px 10px",
+              padding: "10px",
               borderBottom: "1px solid #e5e7eb",
-              color: "#6b7280",
               fontSize: 12,
               fontWeight: 800,
             }}
@@ -245,20 +275,35 @@ export default function HomeClient({ initialData }: Props) {
             <div>Temp</div>
             <div>Weather</div>
             <div style={{ textAlign: "right" }}>Observed at</div>
+            <div style={{ textAlign: "right" }}>Delete</div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {listItems.map((item) => (
-              <WeatherRow
-                key={item.location.id}
-                item={item}
-                onPromote={() => promoteToFeatured(item)}
-                showDelete={true}
-                onDeleted={() => router.refresh()}
-                toast={showToast}
-              />
-            ))}
-          </div>
+          {listItems.map((item) => (
+            <WeatherRow
+              key={item.location.id}
+              item={item}
+              onPromote={() => promoteToFeatured(item)}
+              showDelete
+              onDeleted={() => router.refresh()}
+              toast={showToast}
+            />
+          ))}
+        </section>
+
+        {/* Analytics */}
+        <section
+          style={{
+            background: "#fff",
+            borderRadius: 16,
+            padding: 18,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+          }}
+        >
+          {selectedLocationId ? (
+            <AnalyticsPanel locationId={selectedLocationId} />
+          ) : (
+            <div style={{ color: "#6b7280" }}>선택된 도시가 없습니다.</div>
+          )}
         </section>
       </main>
 
