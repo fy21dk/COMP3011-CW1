@@ -1,5 +1,6 @@
 // frontend/src/features/home/ui/WeatherRow.tsx
 
+
 "use client";
 
 import { deleteLocation } from "@/features/locations/api";
@@ -8,10 +9,8 @@ type Props = {
   item: any;
   onPromote: () => void;
 
-  // ✅ HomeClient에서 router.refresh()를 연결할 콜백
   onDeleted?: () => void;
 
-  // ✅ 하단 목록에서만 Delete 버튼 노출
   showDelete?: boolean;
 
   // (선택) 토스트
